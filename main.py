@@ -1,37 +1,113 @@
+import os
+import argparse
+
 import cv2
 import numpy as np
+import torch
 
-from sd_pipeline import ImageToImagePipeline
-
-
-device = "cuda"
-scheduler = "lms"
-model = "prompthero/openjourney-v4"
-prompt = (
-    "an vintage impressionist style painting, painted by Claude Monet, oil on canvas"
-)
-video_path = "/home/fastdh/server/fast-painter/fp_test_2.mp4"
-STRENGTH = 0.2
-GUIDANCE = 7
-NUM_STEPS = 25
-SEED = 1024
+from sd_pipeline import MultiControlnetPipeline
+import os
 
 
-pipe = ImageToImagePipeline(
-    model=model,
-    scheduler=scheduler,
-    seed=SEED,
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    # SD diffusers
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="prompthero/openjourney-v4",
+    )
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        default= "an vintage impressionist style painting, painted by Claude Monet, oil on canvas",
+    )
+    parser.add_argument(
+        "--strength",
+        type=float,
+        default=0.2,
+    )    
+    parser.add_argument(
+        "--guidance",
+        type=float,
+        default=7.0,
+    )
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=25,
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1024,
+    )
+    parser.add_argument(
+        "--scheduler",
+        type=str,
+        default="UniPCMultistep",
+        choices=["UniPCMultistep", "lms", "None"]
+    )
+    parser.add_argument(
+        "--controlnets",
+        type=str,
+        default="lllyasviel/sd-controlnet-normal,lllyasviel/sd-controlnet-canny",
+        choices=["normal, canny, depth, hed, mlsd, seg, scribble, openpose"],
+        help="comma seperated values would be parsed into array"
+    )
+
+    # video settings
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=8,
+    )
+
+    # path
+    parser.add_argument(
+        "--video_load_path",
+        type=str,
+        default= "/home/fastdh/server/consistent-diffuser/data/test_videos/fp_test_3.mp4",
+    )
+    parser.add_argument(
+        "--video_save_dir",
+        type=str,
+        default= "/home/fastdh/server/consistent-diffuser/data/output",
+    )
+
+    args = parser.parse_args()
+
+    # process args
+    if args.scheduler == "None":
+        args.scheduler = None
+
+    args.controlnets = args.controlnets.split(",")
+
+    return args
+
+
+args = parse_args()
+device = "cuda" if torch.cuda.is_available() else "cpu"
+video_file_name = args.video_load_path.split("/")[-1]
+
+
+pipe = MultiControlnetPipeline(
+    model=args.model,
+    scheduler=args.scheduler,
+    controlnets=args.controlnets,
+    seed=args.seed,
     device=device,
 )
 
-cap = cv2.VideoCapture(video_path)
+# set video capture and video writer
+cap = cv2.VideoCapture(args.video_load_path)
 out = cv2.VideoWriter(
-    filename="output.mp4",
+    filename=os.path.join(args.video_save_dir, video_file_name),
     fourcc=cv2.VideoWriter_fourcc(*"mp4v"),
-    fps=24,
+    fps=8,
     frameSize=(512, 512),
 )
-
 
 while True:
     ret, frame = cap.read()
@@ -39,11 +115,10 @@ while True:
     if ret:
         image = pipe.preprocess_image(frame)
         image = pipe.run(
-            prompt=prompt,
+            prompt=args.prompt,
             image=image,
-            strength=STRENGTH,
-            guidance=GUIDANCE,
-            num_steps=NUM_STEPS,
+            guidance=args.guidance,
+            num_steps=args.num_steps,
         )
         image = np.array(image)
 

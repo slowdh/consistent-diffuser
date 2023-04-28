@@ -60,6 +60,7 @@ class MultiControlnetPipeline:
         self.set_scheduler(scheduler)
         self.generator = torch.Generator(device=device).manual_seed(seed)
 
+    @staticmethod
     def get_controlnet_modules(controlnets):
         controlnet_modules = []
         for controlnet in controlnets:
@@ -93,3 +94,25 @@ class MultiControlnetPipeline:
             )
         else:
             raise NotImplementedError("Scheduler not supported yet")
+
+    def generate_controlnet_images(self, image):
+        pass
+
+    def preprocess_image(self, image):
+        image = Image.fromarray(image, "RGB")
+        image.thumbnail((512, 512))
+
+        return image
+
+    def run(self, prompt, image, strength, guidance, num_steps):
+        image = self.pipe(
+            prompt=prompt,
+            image=image,
+            generator=self.generator,
+            num_images_per_prompt=1,
+            num_inference_steps=int(num_steps / strength),
+            guidance_scale=guidance
+        ).images[0]
+
+        return image
+    
