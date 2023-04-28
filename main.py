@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import torch
 
-from sd_pipeline import MultiControlnetPipeline
+from model.sd_pipeline import MultiControlnetPipeline
 import os
 
 
@@ -52,9 +52,15 @@ def parse_args():
     parser.add_argument(
         "--controlnets",
         type=str,
-        default="lllyasviel/sd-controlnet-normal,lllyasviel/sd-controlnet-canny",
+        default="canny",
         choices=["normal, canny, depth, hed, mlsd, seg, scribble, openpose"],
         help="comma seperated values would be parsed into array"
+    )
+    parser.add_argument(
+        "--conditioning_scales",
+        type=str,
+        default="0.2",
+        help="shoud have same length as number of controlnets"
     )
 
     # video settings
@@ -82,7 +88,8 @@ def parse_args():
     if args.scheduler == "None":
         args.scheduler = None
 
-    args.controlnets = args.controlnets.split(",")
+    args.controlnets = [item.strip() for item in args.controlnets.split(",")]
+    args.conditioning_scales = [float(item.strip()) for item in args.conditioning_scales.split(",")]
 
     return args
 
@@ -119,6 +126,7 @@ while True:
             image=image,
             guidance=args.guidance,
             num_steps=args.num_steps,
+            controlnet_conditioning_scale=args.conditioning_scales,
         )
         image = np.array(image)
 

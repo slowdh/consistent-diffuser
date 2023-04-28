@@ -8,7 +8,7 @@ from diffusers import (
     LMSDiscreteScheduler,
 )
 
-from controlnet import ControlnetProcessor
+from model.controlnet import ControlnetProcessor
 
 
 class ImageToImagePipeline:
@@ -108,16 +108,18 @@ class MultiControlnetPipeline:
     def preprocess_image(self, image):
         image = Image.fromarray(image, "RGB")
         image.thumbnail((512, 512))
-        return image
 
-    def run(self, prompt, image, strength, guidance, num_steps):
+        return self.controlnet_processor.process(image)
+
+    def run(self, prompt, image, guidance, num_steps, controlnet_conditioning_scale):
         image = self.pipe(
             prompt=prompt,
             image=image,
             generator=self.generator,
             num_images_per_prompt=1,
-            num_inference_steps=int(num_steps / strength),
-            guidance_scale=guidance
+            num_inference_steps=num_steps,
+            guidance_scale=guidance,
+            controlnet_conditioning_scale=controlnet_conditioning_scale,
         ).images[0]
 
         return image
