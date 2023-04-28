@@ -1,7 +1,12 @@
 import torch
 from PIL import Image
-from diffusers import StableDiffusionImg2ImgPipeline
-from diffusers import LMSDiscreteScheduler
+from diffusers import (
+    ControlNetModel,
+    StableDiffusionImg2ImgPipeline,
+    StableDiffusionControlNetPipeline,
+    UniPCMultistepScheduler,
+    LMSDiscreteScheduler,
+)
 
 
 class ImageToImagePipeline:
@@ -14,15 +19,18 @@ class ImageToImagePipeline:
     def get_pipeline(model, device):
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
             model, torch_dtype=torch.float16
-        ).to(device)
+        )
+        pipe.enable_xformers_memory_efficient_attention()
+        pipe.to(device)
+
         return pipe
 
     def set_scheduler(self, scheduler):
-        if scheduler == "lms":
+        if scheduler is None:
+            return
+        elif scheduler == "lms":
             scheduler = LMSDiscreteScheduler.from_config(self.pipe.scheduler.config)
             self.pipe.scheduler = scheduler
-        elif scheduler is None:
-            return
         else:
             raise NotImplementedError("Scheduler not supported yet")
 
@@ -43,3 +51,45 @@ class ImageToImagePipeline:
         image.thumbnail((512, 512))
 
         return image
+
+
+class MultiControlnetPipeline:
+    def __init__(self, model, scheduler, controlnets, seed, device):
+        self.controlnet_modules = self.get_controlnet_modules(controlnets)
+        self.pipe = self.get_pipeline(model, self.controlnet_modules, device)
+        self.set_scheduler(scheduler)
+        self.generator = torch.Generator(device=device).manual_seed(seed)
+
+    def get_controlnet_modules(controlnets):
+        controlnet_modules = []
+        for controlnet in controlnets:
+            controlnet_modules.append(
+                ControlNetModel.from_pretrained(controlnet, torch_dtype=torch.float16)
+            )
+
+        return controlnet_modules
+
+    @staticmethod
+    def get_pipeline(model, controlnet_modules, device):
+        pipe = StableDiffusionControlNetPipeline.from_pretrained(
+            model,
+            controlnet=controlnet_modules,
+            torch_dtype=torch.float16,
+        )
+        pipe.enable_xformers_memory_efficient_attention()
+        pipe.to(device)
+
+        return pipe
+
+    def set_scheduler(self, scheduler):
+        if scheduler is None:
+            return
+        elif scheduler == "lms":
+            scheduler = LMSDiscreteScheduler.from_config(self.pipe.scheduler.config)
+            self.pipe.scheduler = scheduler
+        elif scheduler == "UniPCMultistep":
+            self.pipe.scheduler = UniPCMultistepScheduler.from_config(
+                self.pipe.scheduler.config
+            )
+        else:
+            raise NotImplementedError("Scheduler not supported yet")
