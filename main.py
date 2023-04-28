@@ -52,14 +52,14 @@ def parse_args():
     parser.add_argument(
         "--controlnets",
         type=str,
-        default="canny",
+        default="normal, canny",
         choices=["normal, canny, depth, hed, mlsd, seg, scribble, openpose"],
         help="comma seperated values would be parsed into array"
     )
     parser.add_argument(
         "--conditioning_scales",
         type=str,
-        default="0.2",
+        default="1.0, 1.0",
         help="shoud have same length as number of controlnets"
     )
 
@@ -74,7 +74,7 @@ def parse_args():
     parser.add_argument(
         "--video_load_path",
         type=str,
-        default= "/home/fastdh/server/consistent-diffuser/data/test_videos/fp_test_3.mp4",
+        default= "/home/fastdh/server/consistent-diffuser/data/test_videos/fp_test_1.mp4",
     )
     parser.add_argument(
         "--video_save_dir",
@@ -116,14 +116,21 @@ out = cv2.VideoWriter(
     frameSize=(512, 512),
 )
 
+DEBUGGING = True
 while True:
     ret, frame = cap.read()
 
     if ret:
-        image = pipe.preprocess_image(frame)
+        images = pipe.preprocess_image(frame)
+
+        if DEBUGGING:
+            cv2.imshow('featur0', np.array(images[0]))
+            cv2.imshow('feature1', np.array(images[1]))
+            input('feature check')
+
         image = pipe.run(
             prompt=args.prompt,
-            image=image,
+            image=images,
             guidance=args.guidance,
             num_steps=args.num_steps,
             controlnet_conditioning_scale=args.conditioning_scales,
@@ -133,8 +140,9 @@ while True:
         out.write(image)
 
         # debugging
-        input("for debugging: press any key")
-        cv2.imshow('frame',image)
+        if DEBUGGING:
+            input("for debugging: press any key")
+            cv2.imshow('frame',image)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
