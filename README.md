@@ -1,2 +1,2 @@
-# fast-painter
+# consistent-diffuser
 video style transfer with Stable Diffusion
