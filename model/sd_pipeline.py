@@ -8,6 +8,8 @@ from diffusers import (
     LMSDiscreteScheduler,
 )
 
+from controlnet import ControlnetProcessor
+
 
 class ImageToImagePipeline:
     def __init__(self, model, scheduler, seed, device):
@@ -59,11 +61,19 @@ class MultiControlnetPipeline:
         self.pipe = self.get_pipeline(model, self.controlnet_modules, device)
         self.set_scheduler(scheduler)
         self.generator = torch.Generator(device=device).manual_seed(seed)
+        self.controlnet_processor = ControlnetProcessor(controlnets)
 
     @staticmethod
     def get_controlnet_modules(controlnets):
         controlnet_modules = []
         for controlnet in controlnets:
+            if controlnet == "canny":
+                controlnet = "lllyasviel/sd-controlnet-canny"
+            elif controlnet == "normal":
+                controlnet = "lllyasviel/sd-controlnet-normal"
+            else:
+                raise NotImplementedError(f"Controlnet {controlnet} not supported yet")
+            
             controlnet_modules.append(
                 ControlNetModel.from_pretrained(controlnet, torch_dtype=torch.float16)
             )
@@ -95,13 +105,9 @@ class MultiControlnetPipeline:
         else:
             raise NotImplementedError("Scheduler not supported yet")
 
-    def generate_controlnet_images(self, image):
-        pass
-
     def preprocess_image(self, image):
         image = Image.fromarray(image, "RGB")
         image.thumbnail((512, 512))
-
         return image
 
     def run(self, prompt, image, strength, guidance, num_steps):
