@@ -2,57 +2,12 @@ import torch
 from PIL import Image
 from diffusers import (
     ControlNetModel,
-    StableDiffusionImg2ImgPipeline,
     StableDiffusionControlNetPipeline,
     UniPCMultistepScheduler,
     LMSDiscreteScheduler,
 )
 
 from model.controlnet import ControlnetProcessor
-
-
-class ImageToImagePipeline:
-    def __init__(self, model, scheduler, seed, device):
-        self.pipe = self.get_pipeline(model, device)
-        self.set_scheduler(scheduler)
-        self.generator = torch.Generator(device=device).manual_seed(seed)
-
-    @staticmethod
-    def get_pipeline(model, device):
-        pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-            model, torch_dtype=torch.float16
-        )
-        pipe.enable_xformers_memory_efficient_attention()
-        pipe.to(device)
-
-        return pipe
-
-    def set_scheduler(self, scheduler):
-        if scheduler is None:
-            return
-        elif scheduler == "lms":
-            scheduler = LMSDiscreteScheduler.from_config(self.pipe.scheduler.config)
-            self.pipe.scheduler = scheduler
-        else:
-            raise NotImplementedError("Scheduler not supported yet")
-
-    def run(self, prompt, image, strength, guidance, num_steps):
-        image = self.pipe(
-            prompt=prompt,
-            image=image,
-            strength=strength,
-            guidance_scale=guidance,
-            generator=self.generator,
-            num_inference_steps=int(num_steps / strength),
-        ).images[0]
-
-        return image
-
-    def preprocess_image(self, image):
-        image = Image.fromarray(image, "RGB")
-        image.thumbnail((512, 512))
-
-        return image
 
 
 class MultiControlnetPipeline:
